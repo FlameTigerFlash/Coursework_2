@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QFile>
 #include <QtXml>
+#include <QMap>
 #include <QDomDocument>
 
 QT_BEGIN_NAMESPACE
@@ -26,8 +27,14 @@ private:
     QString XMLPath = "C:/QTProjects/FinalProject/data.xml";
     float lower = 0;
     float upper = 0;
+    float humidity_offset = 0;
+    float humidity_multiplier = 0;
+    QString input_buffer = "";
+    void init_XML();
     void load_stats(const QDomNode& node);
     void save_stats(const QDomNode& node);
+    void readXmlValues(const QDomNode& node, const QMap<QString, void*>& tag_var);
+    void update_humidity(QString inp);
     QDomElement loadXML();
     void saveXML();
 private slots:

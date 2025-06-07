@@ -12,6 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
     inner_port.setStopBits(QSerialPort::OneStop);
     inner_port.open(QSerialPort::ReadWrite);
     connect(&inner_port, SIGNAL(readyRead()), this, SLOT(on_innerMessage()));
+    init_XML();
 }
 
 
@@ -20,20 +21,76 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::load_stats(const QDomNode& node)
+void MainWindow::init_XML()
 {
-    QDomElement min_threshold_element = node.firstChildElement("LowerThreshold");
-    QDomElement max_threshold_element = node.firstChildElement("UpperThreshold");
-    lower = min_threshold_element.firstChild().nodeValue().toFloat();
-    upper = max_threshold_element.firstChild().nodeValue().toFloat();
+    QFile file(XMLPath);
+    QDomDocument domDoc;
+    QDomElement domElement;
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qDebug() << "Failed to open file:" << file.errorString();
+            return;
+        }
+    if (domDoc.setContent(&file))
+    {
+        domElement = domDoc.documentElement();
+        QMap<QString, void*> tagMap = {
+            {"LowerThreshold", &lower},
+            {"UpperThreshold", &upper},
+            {"HumidityOffset", &humidity_offset},
+            {"HumidityMultiplier", &humidity_multiplier}
+        };
+        readXmlValues(domElement, tagMap);
+    }
+    file.close();
 }
 
-void MainWindow::save_stats(const QDomNode& node)
+void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>& tag_var)
 {
-    QDomElement min_threshold_element = node.firstChildElement("LowerThreshold");
-    QDomElement max_threshold_element = node.firstChildElement("UpperThreshold");
-    min_threshold_element.firstChild().setNodeValue(QString::number(lower));
-    max_threshold_element.firstChild().setNodeValue(QString::number(upper));
+       QDomNode cur_node = node.firstChildElement();
+        while (!cur_node.isNull()) {
+            if (cur_node.isElement()) {
+                QDomElement element = cur_node.toElement();
+                QString tagName = element.tagName();
+
+                if (tag_var.contains(tagName)) {
+                    void* variablePtr = tag_var[tagName];
+                    QString valueStr = element.text();
+                    //qDebug() << valueStr;
+                    if (auto floatPtr = static_cast<float*>(variablePtr)) {
+                        *floatPtr = valueStr.toFloat();
+                    }
+                    else if (auto stringPtr = static_cast<QString*>(variablePtr)) {
+                        *stringPtr = valueStr;
+                    }
+            }
+        }
+        cur_node = cur_node.nextSibling();
+    }
+}
+
+void writeXmlValues(QDomDocument& doc, QDomNode& parentNode, const QMap<QString, QVariant>& values)
+{
+    for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
+        const QString& tagName = it.key();
+        const QVariant& value = it.value();
+
+        QDomElement element;
+        QDomNodeList elements = parentNode.toElement().elementsByTagName(tagName);
+
+        if (elements.isEmpty()) {
+            element = doc.createElement(tagName);
+            parentNode.appendChild(element);
+        } else {
+            element = elements.at(0).toElement();
+        }
+
+        QDomText textNode = doc.createTextNode(value.toString());
+        if (element.firstChild().isNull()) {
+            element.appendChild(textNode);
+        } else {
+            element.replaceChild(textNode, element.firstChild());
+        }
+    }
 }
 
 void MainWindow::on_innerMessage()
@@ -45,9 +102,26 @@ void MainWindow::on_innerMessage()
         numRead = inner_port.read(buffer, 100);
         //outer_port.flush();
     }
-    QString inp = buffer;
+    for (int i = 0; i < numRead; i++)
+    {
+        if (buffer[i] == '#')
+        {
+            if (input_buffer.size() > 0)
+            {
+                update_humidity(input_buffer);
+                //qDebug() << input_buffer;
+            }
+            input_buffer = "";
+            continue;
+        }
+        input_buffer += buffer[i];
+    }
+}
+
+void MainWindow::update_humidity(QString inp)
+{
     bool ok;
-    float humidity = inp.toFloat(&ok);
+    float humidity = (inp.toFloat(&ok) + humidity_offset) * humidity_multiplier;
     if (!ok)
     {
         return;
@@ -62,10 +136,15 @@ void MainWindow::on_innerMessage()
     if (domDoc.setContent(&file))
     {
         domElement = domDoc.documentElement();
-        load_stats(domElement);
+        QMap<QString, void*> tagMap = {
+            {"LowerThreshold", &lower},
+            {"UpperThreshold", &upper}
+        };
+        readXmlValues(domElement, tagMap);
+        //load_stats(domElement);
     }
     file.close();
-    ui->lineEdit->setText(inp);
+    ui->lineEdit->setText(QString::number(humidity));
     if (humidity > upper)
     {
         ui->lineEdit->setStyleSheet("color: red");
@@ -111,7 +190,11 @@ void MainWindow::on_pushButton_clicked()
         if (domDoc.setContent(&file))
         {
             domElement = domDoc.documentElement();
-            save_stats(domElement);
+            QMap<QString, QVariant> values = {
+                {"LowerThreshold", lower},
+                {"UpperThreshold", upper}
+            };
+            writeXmlValues(domDoc, domElement, values);
         }
     }
     file.close();

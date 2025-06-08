@@ -30,7 +30,7 @@ private:
     float humidity_offset = 0;
     float humidity_multiplier = 0;
     QString input_buffer = "";
-    void init_XML();
+    void initFromXML();
     void load_stats(const QDomNode& node);
     void save_stats(const QDomNode& node);
     void readXmlValues(const QDomNode& node, const QMap<QString, void*>& tag_var);

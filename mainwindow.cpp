@@ -12,7 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
     inner_port.setStopBits(QSerialPort::OneStop);
     inner_port.open(QSerialPort::ReadWrite);
     connect(&inner_port, SIGNAL(readyRead()), this, SLOT(on_innerMessage()));
-    init_XML();
+    initFromXML();
 }
 
 
@@ -21,7 +21,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::init_XML()
+void MainWindow::initFromXML()
 {
     QFile file(XMLPath);
     QDomDocument domDoc;
@@ -30,6 +30,7 @@ void MainWindow::init_XML()
             qDebug() << "Failed to open file:" << file.errorString();
             return;
         }
+    float window_width = 500, window_height = 500;
     if (domDoc.setContent(&file))
     {
         domElement = domDoc.documentElement();
@@ -37,11 +38,18 @@ void MainWindow::init_XML()
             {"LowerThreshold", &lower},
             {"UpperThreshold", &upper},
             {"HumidityOffset", &humidity_offset},
-            {"HumidityMultiplier", &humidity_multiplier}
+            {"HumidityMultiplier", &humidity_multiplier},
+            {"WindowWidth", &window_width},
+            {"WindowHeight", &window_height}
         };
         readXmlValues(domElement, tagMap);
+        ui->label_5->setText(QString::number(lower));
+        ui->label_6->setText(QString::number(upper));
+        resize((int)window_width, (int)window_height);
     }
     file.close();
+    ui->label_5->setStyleSheet("color:grey");
+    ui->label_6->setStyleSheet("color:grey");
 }
 
 void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>& tag_var)
@@ -55,7 +63,6 @@ void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>&
                 if (tag_var.contains(tagName)) {
                     void* variablePtr = tag_var[tagName];
                     QString valueStr = element.text();
-                    //qDebug() << valueStr;
                     if (auto floatPtr = static_cast<float*>(variablePtr)) {
                         *floatPtr = valueStr.toFloat();
                     }
@@ -177,7 +184,7 @@ void MainWindow::on_pushButton_clicked()
         ui->label_4->setText("Некорректное значение верхней границы.");
         return;
     }
-    if (lower > upper)
+    if (lower > upper || lower < 0 || upper > 100)
     {
         ui->label_4->setText("Указан некорректный диапазон.");
         return;
@@ -209,7 +216,8 @@ void MainWindow::on_pushButton_clicked()
         file.close();
 
     ui->label_4->setText("Диапазон успешно обновлен.");
-
+    ui->label_5->setText(QString::number(lower));
+    ui->label_6->setText(QString::number(upper));
     float humidity = ui->lineEdit->text().toFloat();
     if (humidity > upper)
     {

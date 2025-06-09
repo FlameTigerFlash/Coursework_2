@@ -11,8 +11,24 @@
 #include <math.h>
 #include <stdio.h>
 
+#define RL1 P3_5 
+#define RL2 P3_6 
+#define RL3 P3_7  
+
 char buffer[50];
 
+const unsigned char segment_codes[] = {
+    0x3F, // 0
+    0x06, // 1
+    0x5B, // 2
+    0x4F, // 3
+    0x66, // 4
+    0x6D, // 5
+    0x7D, // 6
+    0x07, // 7
+    0x7F, // 8
+    0x6F  // 9
+};
  
  void delay_t(uint32_t ms){//задержка
 	for (uint32_t i = 0; i < ms; i++)
@@ -30,11 +46,17 @@ void UART_Init() {
 }
 
 
-char UART_Receive() {
-    while (!RI); 
-    RI = 0;
-    return SBUF;
+char UART_Receive(unsigned int timeout) {
+    while (timeout--) {
+        if (RI) {
+            RI = 0;
+            return SBUF;
+        }
+        for (int i = 0; i < 1275; i++);
+    }
+    return '*';
 }
+
 
 int UART_is_not_Empty(){
 	return RI;
@@ -57,8 +79,23 @@ int calculate_humidity(unsigned char adc_value) {
    return (val - 41) / 12.0 * 100.0;
 }
 
+void display_digit_color(unsigned char digit, char color) {
+    RL1 = 0;
+    RL2 = 0;
+    RL3 = 0;
+
+    if (color == 'r') RL3 = 1;     // red
+    else if (color == 'b') RL1 = 1; // blue
+    else if (color == 'g') RL2 = 1; // green
+
+    P0 = 0xFF-segment_codes[digit];
+}
+
 void main(void)
  { 
+    RL1 = 0;
+    RL2 = 0;
+    RL3 = 0;
     P2=2;
     delay_t(100);
     P2=3;
@@ -66,9 +103,13 @@ void main(void)
    while (1)
    {
       float hum = calculate_humidity(P1);
-      //sprintf(buffer, "%.d#", (P1 - 41) * 100 / 12);
       sprintf(buffer, "%.d#", P1);
       send_string(buffer);
-      delay_t(1000);
+      char num = UART_Receive(1000);
+      delay_t(200);
+      char color = UART_Receive(100);
+      display_digit_color(num-'0', color);
+      RI=0;
+      delay_t(800);
    }
  }

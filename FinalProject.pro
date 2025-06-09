@@ -27,6 +27,11 @@ HEADERS += \
 FORMS += \
     mainwindow.ui
 
+TRANSLATIONS += \
+    Translation_en_VI.ts\
+    Translation_ru_VI.ts\
+    Translation_de_VI.ts
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin

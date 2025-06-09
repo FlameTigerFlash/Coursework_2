@@ -1,6 +1,6 @@
 <Threshold>
-    <LowerThreshold>6</LowerThreshold>
-    <UpperThreshold>100</UpperThreshold>
+    <LowerThreshold>70</LowerThreshold>
+    <UpperThreshold>70</UpperThreshold>
     <HumidityOffset>-41</HumidityOffset>
     <HumidityMultiplier>8.33</HumidityMultiplier>
     <WindowWidth>100</WindowWidth>

@@ -6,6 +6,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++11
 
+TRANSLATIONS += lang_ru_RU.ts \
+                lang_en_US.ts \
+                lang_de_DE.ts
+
 # The following define makes your compiler emit warnings if you use
 # any Qt feature that has been marked deprecated (the exact warnings
 # depend on your compiler). Please consult the documentation of the
@@ -26,11 +30,6 @@ HEADERS += \
 
 FORMS += \
     mainwindow.ui
-
-TRANSLATIONS += \
-    Translation_en_VI.ts\
-    Translation_ru_VI.ts\
-    Translation_de_VI.ts
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

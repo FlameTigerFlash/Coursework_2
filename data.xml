@@ -1,6 +1,0 @@
-<Threshold>
-    <LowerThreshold>33.31399917602539</LowerThreshold>
-    <UpperThreshold>33.320011138916016</UpperThreshold>
-    <HumidityOffset>-41</HumidityOffset>
-    <HumidityMultiplier>8.33</HumidityMultiplier>
-</Threshold>

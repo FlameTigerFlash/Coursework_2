@@ -1,24 +1,125 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include <QSettings>
+#include <QLibraryInfo>
+#include <QButtonGroup>
+#include <QRadioButton>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
     inner_port.setPortName("COM1");
     inner_port.setBaudRate(QSerialPort::Baud9600);
     inner_port.setDataBits(QSerialPort::Data8);
     inner_port.setStopBits(QSerialPort::OneStop);
     inner_port.open(QSerialPort::ReadWrite);
     connect(&inner_port, SIGNAL(readyRead()), this, SLOT(on_innerMessage()));
-    init_XML();
-}
 
+    init_XML();
+    initLanguageMenu();
+
+
+    QSettings settings;
+    currentLang = settings.value("Language", "en_US").toString();
+    loadLanguage(currentLang);
+}
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::initLanguageMenu()
+{
+    langButtonGroup = new QButtonGroup(this);
+
+    langButtonGroup->addButton(ui->radioButton, 0);
+    langButtonGroup->addButton(ui->radioButton_2, 1);
+    langButtonGroup->addButton(ui->radioButton_3, 2);
+
+    if(currentLang == "ru_RU") {
+        ui->radioButton->setChecked(true);
+    } else if(currentLang == "en_US") {
+        ui->radioButton_2->setChecked(true);
+    } else if(currentLang == "de_DE") {
+        ui->radioButton_3->setChecked(true);
+    }
+
+    connect(langButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onLanguageChanged(int)));
+}
+
+void MainWindow::onLanguageChanged(int id)
+{
+    QString lang;
+    switch(id) {
+        case 0: lang = "ru_RU"; break;
+        case 1: lang = "en_US"; break;
+        case 2: lang = "de_DE"; break;
+        default: lang = "en_US";
+    }
+
+    if(currentLang != lang) {
+        loadLanguage(lang);
+    }
+}
+
+void MainWindow::loadLanguage(const QString &lang)
+{
+    QApplication::removeTranslator(&appTranslator);
+    QApplication::removeTranslator(&qtTranslator);
+
+    if(appTranslator.load(TranslationsPath + lang + ".qm")) {
+        QApplication::installTranslator(&appTranslator);
+    }
+
+    if(qtTranslator.load("qt_" + lang, QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
+        QApplication::installTranslator(&qtTranslator);
+    }
+
+    currentLang = lang;
+
+    QSettings settings;
+    settings.setValue("Language", lang);
+
+    retranslateUi();
+}
+
+void MainWindow::retranslateUi()
+{
+    ui->retranslateUi(this);
+    setWindowTitle(tr("Humidity Monitor"));
+
+    ui->radioButton->setText(tr("Русский"));
+    ui->radioButton_2->setText(tr("English"));
+    ui->radioButton_3->setText(tr("Deutsch"));
+
+    QString currentMessage = ui->label_4->text();
+    if(!currentMessage.isEmpty()) {
+        if(currentMessage == "Некорректное значение нижней границы.") {
+            ui->label_4->setText(tr("Некорректное значение нижней границы."));
+        }
+        else if(currentMessage == "Некорректное значение верхней границы.") {
+            ui->label_4->setText(tr("Некорректное значение верхней границы."));
+        }
+        else if(currentMessage == "Указан некорректный диапазон.") {
+            ui->label_4->setText(tr("Указан некорректный диапазон."));
+        }
+        else if(currentMessage == "Диапазон успешно обновлен.") {
+            ui->label_4->setText(tr("Диапазон успешно обновлен."));
+        }
+    }
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    if(event->type() == QEvent::LanguageChange) {
+        retranslateUi();
+    }
+    QMainWindow::changeEvent(event);
 }
 
 void MainWindow::init_XML()
@@ -27,7 +128,7 @@ void MainWindow::init_XML()
     QDomDocument domDoc;
     QDomElement domElement;
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "Failed to open file:" << file.errorString();
+            qDebug() << tr("Failed to open file:") << file.errorString();
             return;
         }
     if (domDoc.setContent(&file))
@@ -55,7 +156,6 @@ void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>&
                 if (tag_var.contains(tagName)) {
                     void* variablePtr = tag_var[tagName];
                     QString valueStr = element.text();
-                    //qDebug() << valueStr;
                     if (auto floatPtr = static_cast<float*>(variablePtr)) {
                         *floatPtr = valueStr.toFloat();
                     }
@@ -100,7 +200,6 @@ void MainWindow::on_innerMessage()
     if (inner_port.bytesAvailable() > 0)
     {
         numRead = inner_port.read(buffer, 100);
-        //outer_port.flush();
     }
     for (int i = 0; i < numRead; i++)
     {
@@ -109,7 +208,6 @@ void MainWindow::on_innerMessage()
             if (input_buffer.size() > 0)
             {
                 update_humidity(input_buffer);
-                //qDebug() << input_buffer;
             }
             input_buffer = "";
             continue;
@@ -130,7 +228,7 @@ void MainWindow::update_humidity(QString inp)
     QDomDocument domDoc;
     QDomElement domElement;
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "Failed to open file:" << file.errorString();
+            qDebug() << tr("Failed to open file:") << file.errorString();
             return;
         }
     if (domDoc.setContent(&file))
@@ -141,7 +239,6 @@ void MainWindow::update_humidity(QString inp)
             {"UpperThreshold", &upper}
         };
         readXmlValues(domElement, tagMap);
-        //load_stats(domElement);
     }
     file.close();
     ui->lineEdit->setText(QString::number(humidity));
@@ -168,18 +265,18 @@ void MainWindow::on_pushButton_clicked()
     lower = lower_val.toFloat(&ok);
     if (!ok)
     {
-        ui->label_4->setText("Некорректное значение нижней границы.");
+        ui->label_4->setText(tr("Некорректное значение нижней границы."));
         return;
     }
     upper = upper_val.toFloat(&ok);
     if (!ok)
     {
-        ui->label_4->setText("Некорректное значение верхней границы.");
+        ui->label_4->setText(tr("Некорректное значение верхней границы."));
         return;
     }
     if (lower > upper)
     {
-        ui->label_4->setText("Указан некорректный диапазон.");
+        ui->label_4->setText(tr("Указан некорректный диапазон."));
         return;
     }
     QFile file(XMLPath);
@@ -199,16 +296,16 @@ void MainWindow::on_pushButton_clicked()
     }
     file.close();
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-            qDebug() << "Failed to save file";
+            qDebug() << tr("Failed to save file");
             return;
         }
 
         QTextStream stream(&file);
         stream.setCodec("UTF-8");
-        domDoc.save(stream, 4);  // 4 - отступ для форматирования
+        domDoc.save(stream, 4);
         file.close();
 
-    ui->label_4->setText("Диапазон успешно обновлен.");
+    ui->label_4->setText(tr("Диапазон успешно обновлен."));
 
     float humidity = ui->lineEdit->text().toFloat();
     if (humidity > upper)

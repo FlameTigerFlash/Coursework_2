@@ -31,8 +31,8 @@ protected:
 private:
     Ui::MainWindow *ui;
     QSerialPort inner_port;
-    QString XMLPath = "C:/QTProjects/FinalProject/data.xml";
-    QString TranslationsPath = "C:/QTProjects/FinalProject/lang_";
+    QString XMLPath = "C:/Users/matve/Downloads/Coursework_2-main/data.xml";
+    QString TranslationsPath = "C:/Users/matve/Downloads/Coursework_2-main/lang_";
     float lower = 0;
     float upper = 0;
     float humidity_offset = 0;

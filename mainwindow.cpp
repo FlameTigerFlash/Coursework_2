@@ -12,12 +12,12 @@ MainWindow::MainWindow(QWidget *parent)
     inner_port.setStopBits(QSerialPort::OneStop);
     inner_port.open(QSerialPort::ReadWrite);
     connect(&inner_port, SIGNAL(readyRead()), this, SLOT(on_innerMessage()));
-    initFromXML();
     initLanguageMenu();
 
     QSettings settings;
     currentLang = settings.value("Language", "en_US").toString();
     loadLanguage(currentLang);
+    initFromXML();
 }
 
 
@@ -105,6 +105,9 @@ void MainWindow::retranslateUi()
             ui->label_4->setText(tr("Диапазон успешно обновлен."));
         }
     }
+
+    ui->label_5->setText(QString::number(lower));
+    ui->label_6->setText(QString::number(upper));
 }
 
 void MainWindow::changeEvent(QEvent *event)
@@ -125,6 +128,8 @@ void MainWindow::initFromXML()
             return;
         }
     float window_width = 500, window_height = 500;
+    ui->label_5->setStyleSheet("color:grey");
+    ui->label_6->setStyleSheet("color:grey");
     if (domDoc.setContent(&file))
     {
         domElement = domDoc.documentElement();
@@ -142,8 +147,6 @@ void MainWindow::initFromXML()
         resize((int)window_width, (int)window_height);
     }
     file.close();
-    ui->label_5->setStyleSheet("color:grey");
-    ui->label_6->setStyleSheet("color:grey");
 }
 
 void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>& tag_var)
@@ -266,6 +269,10 @@ void MainWindow::update_humidity(QString inp)
 
 
     QString output = QString::number((int)humidity/10);
+    if (humidity == 100)
+    {
+        output = "9";
+    }
     if (humidity > upper)
     {
         ui->lineEdit->setStyleSheet("color: red");

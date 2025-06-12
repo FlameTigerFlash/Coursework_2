@@ -10,6 +10,8 @@
 #include <QDomDocument>
 #include <QTime>
 #include <QCoreApplication>
+#include <QTranslator>
+#include <QButtonGroup>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -23,15 +25,26 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void changeEvent(QEvent *event) override;
+
 private:
     Ui::MainWindow *ui;
     QSerialPort inner_port;
-    QString XMLPath = "C:/QTProjects/FinalProject/data.xml";
+    QString XMLPath = "C:/Users/matve/Downloads/Coursework_2-main/data.xml";
+    QString TranslationsPath = "C:/Users/matve/Downloads/Coursework_2-main/lang_";
     float lower = 0;
     float upper = 0;
     float humidity_offset = 0;
     float humidity_multiplier = 0;
+    bool output_blocked = false;
     QString input_buffer = "";
+
+    QTranslator appTranslator;
+    QTranslator qtTranslator;
+    QString currentLang = "en_US";
+    QButtonGroup *langButtonGroup;
+
     void initFromXML();
     void load_stats(const QDomNode& node);
     void save_stats(const QDomNode& node);
@@ -40,8 +53,13 @@ private:
     QDomElement loadXML();
     void saveXML();
     void sendDeferred(QString str, int delay);
+
+    void loadLanguage(const QString &lang);
+    void retranslateUi();
+    void initLanguageMenu();
 private slots:
     void on_innerMessage();
     void on_pushButton_clicked();
+    void onLanguageChanged(int id);
 };
 #endif // MAINWINDOW_H

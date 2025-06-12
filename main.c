@@ -30,7 +30,7 @@ const unsigned char segment_codes[] = {
     0x6F  // 9
 };
  
- void delay_t(uint32_t ms){//задержка
+ void delay_t(uint32_t ms){
 	for (uint32_t i = 0; i < ms; i++)
 	   {
 	      for (int j = 0; j < 85; j++);
@@ -46,20 +46,15 @@ void UART_Init() {
 }
 
 
-char UART_Receive(unsigned int timeout) {
+unsigned char UART_Receive(unsigned int timeout) {
     while (timeout--) {
         if (RI) {
             RI = 0;
             return SBUF;
         }
-        for (int i = 0; i < 1275; i++);
+        for (int i = 0; i < 85; i++);
     }
     return '*';
-}
-
-
-int UART_is_not_Empty(){
-	return RI;
 }
 
 void putc(uint8_t input){
@@ -74,11 +69,6 @@ void send_string(const char *str) {
     }
 }
 
-int calculate_humidity(unsigned char adc_value) {
-    float val = adc_value;
-   return (val - 41) / 12.0 * 100.0;
-}
-
 void display_digit_color(unsigned char digit, char color) {
     RL1 = 0;
     RL2 = 0;
@@ -91,8 +81,35 @@ void display_digit_color(unsigned char digit, char color) {
     P0 = 0xFF-segment_codes[digit];
 }
 
+void set_number(unsigned char d1,  unsigned char d2, unsigned char d3, int it, int delay)
+{
+   if (!(d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >='0' && d3 <= '9'))
+   {
+	 return;
+   }
+     RL1 = 0;
+     RL2 = 0;
+      RL3 = 0;
+      for (int i = 0; i < it; i++)
+      {
+	 P0 = 0xFF-segment_codes[d1-'0'];
+	 RL1 = 1;
+	 delay_t(delay);
+	 RL1 =0;
+	 P0 = 0xFF-segment_codes[d2-'0'];
+	 RL2 = 1;
+	 delay_t(delay);
+	 RL2=0;
+	 P0 = 0xFF-segment_codes[d3-'0'];
+	 RL3 = 1;
+	 delay_t(delay);
+	 RL3=0;
+      }
+}
+
 void main(void)
  { 
+    
     RL1 = 0;
     RL2 = 0;
     RL3 = 0;
@@ -100,16 +117,50 @@ void main(void)
     delay_t(100);
     P2=3;
     UART_Init();
+    
+    unsigned int cnt = 0;
+    unsigned char d1 = '0', d2 = '0', d3 = '0';
+    unsigned char d1_new = '0', d2_new = '0';
+    
+    const unsigned int DELAY = 500;
+    const unsigned int IT = 1;
+    unsigned int time_passed = 0;
    while (1)
    {
-      float hum = calculate_humidity(P1);
-      sprintf(buffer, "%.d#", P1);
-      send_string(buffer);
-      char num = UART_Receive(1000);
-      delay_t(200);
-      char color = UART_Receive(100);
-      display_digit_color(num-'0', color);
-      RI=0;
-      delay_t(800);
+      if (time_passed >= 1000)
+      {
+	 sprintf(buffer, "%.d#", P1);
+	 send_string(buffer);
+	 time_passed = 0;
+      }
+      if (RI)
+      {
+	    unsigned char inp = UART_Receive(100);
+	    if (inp > '9' || inp < '0')
+	    {
+		  cnt = 0;
+	       }
+	       else
+	       {
+		     cnt += 1;
+		     if (cnt == 1)
+		     {
+			   d1_new = inp;
+			}
+		     else if (cnt == 2)
+		     {
+			   d2_new = inp;
+			}
+		     else if (cnt >= 3)
+		     {
+			   d1 = d1_new;
+			   d2 = d2_new;
+			   d3 = inp;
+			   cnt = 0;
+			}
+		  }
+	 }
+      set_number(d1, d2, d3, IT, DELAY);
+      time_passed += IT * DELAY * 3;
    }
  }

@@ -1,8 +1,9 @@
 <Threshold>
-    <LowerThreshold>10</LowerThreshold>
-    <UpperThreshold>80</UpperThreshold>
+    <LowerThreshold>40</LowerThreshold>
+    <UpperThreshold>75</UpperThreshold>
     <HumidityOffset>-41</HumidityOffset>
     <HumidityMultiplier>8.33</HumidityMultiplier>
-    <WindowWidth>800</WindowWidth>
-    <WindowHeight>800</WindowHeight>
+    <WindowWidth>1000</WindowWidth>
+    <WindowHeight>1500</WindowHeight>
+    <Language>en_US</Language>
 </Threshold>

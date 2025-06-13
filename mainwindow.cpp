@@ -12,12 +12,11 @@ MainWindow::MainWindow(QWidget *parent)
     inner_port.setStopBits(QSerialPort::OneStop);
     inner_port.open(QSerialPort::ReadWrite);
     connect(&inner_port, SIGNAL(readyRead()), this, SLOT(on_innerMessage()));
-    initLanguageMenu();
 
-    QSettings settings;
-    currentLang = settings.value("Language", "en_US").toString();
-    loadLanguage(currentLang);
     initFromXML();
+
+    initLanguageMenu();
+    loadLanguage(currentLang);
 }
 
 
@@ -57,6 +56,30 @@ void MainWindow::onLanguageChanged(int id)
 
     if(currentLang != lang) {
         loadLanguage(lang);
+        QFile file(XMLPath);
+        QDomDocument domDoc;
+        QDomElement domElement;
+        if (file.open(QIODevice::ReadWrite))
+        {
+            if (domDoc.setContent(&file))
+            {
+                domElement = domDoc.documentElement();
+                QMap<QString, QVariant> values = {
+                    {"Language", currentLang},
+                };
+                writeXmlValues(domDoc, domElement, values);
+            }
+        }
+        file.close();
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+                qDebug() << tr("Failed to save file");
+                return;
+            }
+
+        QTextStream stream(&file);
+        stream.setCodec("UTF-8");
+        domDoc.save(stream, 4);
+        file.close();
     }
 }
 
@@ -74,10 +97,6 @@ void MainWindow::loadLanguage(const QString &lang)
     }
 
     currentLang = lang;
-
-    QSettings settings;
-    settings.setValue("Language", lang);
-
     retranslateUi();
 }
 
@@ -139,7 +158,8 @@ void MainWindow::initFromXML()
             {"HumidityOffset", &humidity_offset},
             {"HumidityMultiplier", &humidity_multiplier},
             {"WindowWidth", &window_width},
-            {"WindowHeight", &window_height}
+            {"WindowHeight", &window_height},
+            {"Language", &currentLang}
         };
         readXmlValues(domElement, tagMap);
         ui->label_5->setText(QString::number(lower));
@@ -160,8 +180,12 @@ void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>&
                 if (tag_var.contains(tagName)) {
                     void* variablePtr = tag_var[tagName];
                     QString valueStr = element.text();
-                    if (auto floatPtr = static_cast<float*>(variablePtr)) {
-                        *floatPtr = valueStr.toFloat();
+                    bool ok; valueStr.toFloat(&ok);
+                    if (ok)
+                    {
+                        if (auto floatPtr = static_cast<float*>(variablePtr)) {
+                            *floatPtr = valueStr.toFloat();
+                        }
                     }
                     else if (auto stringPtr = static_cast<QString*>(variablePtr)) {
                         *stringPtr = valueStr;
@@ -172,7 +196,7 @@ void MainWindow::readXmlValues(const QDomNode& node, const QMap<QString, void*>&
     }
 }
 
-void writeXmlValues(QDomDocument& doc, QDomNode& parentNode, const QMap<QString, QVariant>& values)
+void MainWindow::writeXmlValues(QDomDocument& doc, QDomNode& parentNode, const QMap<QString, QVariant>& values)
 {
     for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
         const QString& tagName = it.key();
@@ -223,8 +247,10 @@ void MainWindow::on_innerMessage()
 
 void MainWindow::sendDeferred(QString str, int delay)
 {
+    output_blocked = true;
     for (int i = 0; i < str.size(); i++)
     {
+        qDebug() << (str[i]);
         const char* out = ((QString)str[i]).toStdString().c_str();
         inner_port.write(out);
         inner_port.flush();
@@ -233,6 +259,7 @@ void MainWindow::sendDeferred(QString str, int delay)
                 QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
         }
     }
+    output_blocked = false;
 }
 
 void MainWindow::update_humidity(QString inp)
@@ -267,28 +294,32 @@ void MainWindow::update_humidity(QString inp)
     file.close();
     ui->lineEdit->setText(QString::number(humidity));
 
-
-    QString output = QString::number((int)humidity/10);
+    QString output = QString::number(humidity * 10);
+    output = output.mid(0,3);
     if (humidity == 100)
     {
-        output = "9";
+        output = "100";
+    }
+    else if (humidity < 10)
+    {
+        output = ("0" + output).mid(0, 3);
     }
     if (humidity > upper)
     {
         ui->lineEdit->setStyleSheet("color: red");
-        output += "r";
     }
     else if (humidity < lower)
     {
         ui->lineEdit->setStyleSheet("color: blue");
-        output += "b";
     }
     else
     {
         ui->lineEdit->setStyleSheet("color: green");
-        output += "g";
     }
-    sendDeferred(output, 210);
+    if (!output_blocked)
+    {
+        sendDeferred(output + "&&&", 2500);
+    }
     return;
 }
 
@@ -297,19 +328,21 @@ void MainWindow::on_pushButton_clicked()
     QString lower_val = ui->lineEdit_2->text();
     QString upper_val = ui->lineEdit_3->text();
     bool ok;
-    lower = lower_val.toFloat(&ok);
-    if (!ok)
+    float res = lower_val.toFloat(&ok);
+    if (!ok || res < 0)
     {
         ui->label_4->setText(tr("Некорректное значение нижней границы."));
         return;
     }
-    upper = upper_val.toFloat(&ok);
-    if (!ok)
+    lower = res;
+    res = upper_val.toFloat(&ok);
+    if (!ok || res > 100)
     {
         ui->label_4->setText(tr("Некорректное значение верхней границы."));
         return;
     }
-    if (lower > upper || lower < 0 || upper > 100)
+    upper = res;
+    if (lower > upper)
     {
         ui->label_4->setText(tr("Указан некорректный диапазон."));
         return;
